@@ -6,7 +6,7 @@ import pandas as pd
 refresh_token = open("secret.txt", "r").read()
 # get your own from: https://develop.openaire.eu/personal-token
 
-def get_openaire_df(keywords, size, page):
+def get_openaire_df(keywords, size=100, page=1):
     # GET https://services.openaire.eu/uoa-user-management/api/users/getAccessToken?refreshToken={your_refresh_token}
     token_response = requests.get('https://services.openaire.eu/uoa-user-management/api/users/getAccessToken?refreshToken=' + refresh_token)
     token_response = json.loads(token_response.content)
