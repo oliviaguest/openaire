@@ -1,10 +1,10 @@
-import pandas as pd
 import json
 import xmltodict
 import requests
-from xml.etree import ElementTree
+import pandas as pd
+# from xml.etree import ElementTree
 
-refresh_token = open("secret.txt", "r")
+refresh_token = open("secret.txt", "r").read()
 # get your own from: https://develop.openaire.eu/personal-token
 
 def get_inner_data(middle_data, inner_data_key, inner_data_value):
@@ -38,8 +38,6 @@ def get_inner_col(json_dict, middle_data_key, inner_data_key, inner_data_value):
 
 
 def get_openaire_df(keywords):
-    # refresh_token = load it somehow 
-
     # GET https://services.openaire.eu/uoa-user-management/api/users/getAccessToken?refreshToken={your_refresh_token}
     token_response = requests.get('https://services.openaire.eu/uoa-user-management/api/users/getAccessToken?refreshToken=' + refresh_token)
     token_response = json.loads(token_response.content)
@@ -69,7 +67,5 @@ def get_openaire_df(keywords):
     return pd.DataFrame.from_dict(df_dict)
 
 
-
 if __name__ == '__main__':
-
     print(get_openaire_df(keywords='category, cognition'))
