@@ -2,7 +2,6 @@ import json
 import xmltodict
 import requests
 import pandas as pd
-# from xml.etree import ElementTree
 
 refresh_token = open("secret.txt", "r").read()
 # get your own from: https://develop.openaire.eu/personal-token
@@ -43,7 +42,8 @@ def get_openaire_df(keywords):
     token_response = json.loads(token_response.content)
     token = 'Bearer {t}'.format(t = token_response['access_token'])
     params = {'keywords': '{t}'.format(t = keywords)}
-    # params = {'keywords': 'category, cognition'} # to be clear, I have no idea what this does! it just seems a sensible starting point!
+    # params = {'keywords': 'category, cognition'} # to be clear, I have no idea what this does!
+    # it just seems a sensible starting point!
     # to test it try: https://api.openaire.eu/search/researchProducts?keywords=categorisation,cognition
 
     response = requests.get("https://api.openaire.eu/search/researchProducts",
