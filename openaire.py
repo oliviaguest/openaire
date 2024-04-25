@@ -7,8 +7,9 @@ from lxml import html
 
 
 load_dotenv(".env")
-# get your own from: https://develop.openaire.eu/personal-token
 refresh_token = os.getenv("OPENAIRE_REFRESH")
+# get your own from: https://develop.openaire.eu/personal-token
+# https://graph.openaire.eu/docs/apis/authentication
 
 
 def get_openaire_sample(keywords, size=10_000, page=1):
@@ -45,15 +46,23 @@ def parse_openaire_tree(tree):
     out = list()
     result_tree = tree.findall(".//results/result")
     for result in result_tree:
-        instance_type = result.xpath(".//instancetype/@classname")[0]
+        if len(result.xpath(".//instancetype/@classname")) > 0:
+            instance_type = result.xpath(".//instancetype/@classname")[0]
+        else:
+            instance_type = "Unknown"
         data_source = result.xpath(".//collectedfrom/@name")[0]
-        publication_date = result.xpath(".//dateofacceptance")[0].text
+        if len(result.xpath(".//dateofacceptance")) > 0:
+            publication_date = result.xpath(".//dateofacceptance")[0].text
+        else:
+            publication_date = "Unknown"
         publication_year = (
             re.search(r"(\d{4})-\d{2}-\d{2}", publication_date).group(1)
             if re.search(r"(\d{4})-\d{2}-\d{2}", publication_date)
             else None
         )
-        refereed = result.xpath(".//refereed/@classname")[0]
+        if len (result.xpath(".//refereed/@classname")) > 0:
+            refereed = result.xpath(".//refereed/@classname")[0]
+        urls = [url.text for url in result.xpath(".//webresource/url")]
 
         if instance_type == "Article":
             try:
@@ -97,6 +106,7 @@ def parse_openaire_tree(tree):
                 "type": instance_type,
                 "journal": journal,
                 "doi": doi,
+                "url": urls,
                 "publisher": publisher,
                 "authors": author_list,
                 "publication_year": publication_year,
@@ -134,6 +144,6 @@ if __name__ == "__main__":
     openaire_tree = html.fromstring(openaire_data)
     openaire_sample = parse_openaire_tree(openaire_tree)
     for publication in openaire_sample:
-        print("\n")
         for tag, value in publication.items():
             print(f"{tag}: {value}")
+        break
