@@ -28,17 +28,38 @@ def get_openaire_sample(keywords, size=10_000, page=1):
     }
     # to test it try: https://api.openaire.eu/search/researchProducts?keywords=categorization,cognition&format=xml
 
-    response = requests.get(
+    initial_response = requests.get(
         "https://api.openaire.eu/search/researchProducts",
         headers={"Authorization": token},
         params=params,
     )
-    response.raise_for_status()  # raises exception when not a 2xx response
+    initial_response.raise_for_status()  # raises exception when not a 2xx response
 
-    tree = html.fromstring(response.content)
-    n_results = tree.xpath("//total")[0].text
+    tree = html.fromstring(initial_response.content)
+    n_results = int(tree.xpath("//total")[0].text)
 
-    return response.content, n_results
+    if n_results > 10_000:  # if hitting openaire limit
+        requests_required = int(n_results) // 10_000 + 1
+        response = ""
+        for r in range(requests_required):
+            subsequent_response = requests.get(
+                "https://api.openaire.eu/search/researchProducts",
+                headers={"Authorization": token},
+                params={
+                    "keywords": "{t}".format(t=keywords),
+                    "format": "xml",
+                    "size": 10_000,
+                    "page": r,
+                },
+            )
+            subsequent_response = subsequent_response.content.decode("utf-8").split(
+                "\n"
+            )[1:]
+            response += "".join(subsequent_response)
+    else:
+        response = initial_response.content
+
+    return response, n_results
 
 
 def parse_openaire_tree(tree):
@@ -55,12 +76,17 @@ def parse_openaire_tree(tree):
             publication_date = result.xpath(".//dateofacceptance")[0].text
         else:
             publication_date = "Unknown"
-        publication_year = (
-            re.search(r"(\d{4})-\d{2}-\d{2}", publication_date).group(1)
-            if re.search(r"(\d{4})-\d{2}-\d{2}", publication_date)
-            else None
-        )
-        if len (result.xpath(".//refereed/@classname")) > 0:
+
+        try:
+            publication_year = (
+                re.search(r"(\d{4})-\d{2}-\d{2}", publication_date).group(1)
+                if re.search(r"(\d{4})-\d{2}-\d{2}", publication_date)
+                else None
+            )
+        except TypeError:
+            publication_year = None
+
+        if len(result.xpath(".//refereed/@classname")) > 0:
             refereed = result.xpath(".//refereed/@classname")[0]
         urls = [url.text for url in result.xpath(".//webresource/url")]
 
@@ -122,10 +148,13 @@ def parse_openaire_tree(tree):
 
 if __name__ == "__main__":
     import argparse
+    import pandas as pd
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--page", type=int, default=1, help="Page number")
-    parser.add_argument("--size", type=int, default=1, help="Number of results to get")
+    parser.add_argument(
+        "--size", type=int, default=10_000, help="Number of results to get"
+    )
     parser.add_argument(
         "--keywords",
         type=str,
@@ -139,11 +168,9 @@ if __name__ == "__main__":
         keywords=args.keywords, size=args.size, page=args.page
     )
     print(f"Results found: {n}")
-    with open("openaire.xml", "w") as f:
-        print(openaire_data.decode("utf-8"), file=f)
+    # with open("openaire.xml", "w") as f:
+    #     print(openaire_data.decode("utf-8"), file=f)
     openaire_tree = html.fromstring(openaire_data)
     openaire_sample = parse_openaire_tree(openaire_tree)
-    for publication in openaire_sample:
-        for tag, value in publication.items():
-            print(f"{tag}: {value}")
-        break
+    df = pd.DataFrame(openaire_sample)
+    df.to_csv("openaire_sample.csv", index=False)
