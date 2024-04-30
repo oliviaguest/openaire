@@ -12,7 +12,7 @@ refresh_token = os.getenv("OPENAIRE_REFRESH")
 # https://graph.openaire.eu/docs/apis/authentication
 
 
-def get_openaire_sample(keywords, size=10_000, page=1):
+def get_openaire_sample(keywords, **kwargs):
     # GET https://services.openaire.eu/uoa-user-management/api/users/getAccessToken?refreshToken={your_refresh_token}
     token_response = requests.get(
         "https://services.openaire.eu/uoa-user-management/api/users/getAccessToken?refreshToken="
@@ -20,12 +20,17 @@ def get_openaire_sample(keywords, size=10_000, page=1):
     )
     token_response = json.loads(token_response.content)
     token = "Bearer {t}".format(t=token_response["access_token"])
-    params = {
-        "keywords": "{t}".format(t=keywords),
-        "format": "xml",
-        "size": size,
-        "page": page,
-    }
+
+    params = {param: value for param, value in kwargs.items()}
+    params["keywords"] = keywords
+    params["format"] = "xml"
+    params["size"] = 10_000
+    params["page"] = 1
+    # The supported parameters are: funder, country, resultID, keywords, toDateAccepted,
+    # openaireProjectID, hasWTFunding, title, influence, OA, fundingStream, popularity, instancetype,
+    # model, projectID, openaireProviderID, publiclyFunded, citationCount, author, FP7ProjectID,
+    # orcid, hasProject, community, hasECFunding, version, fromDateAccepted, FP7scientificArea,
+    # impulse, originalId, doi, size, format, sortBy, page
     # to test it try: https://api.openaire.eu/search/researchProducts?keywords=categorization,cognition&format=xml
 
     initial_response = requests.get(
@@ -38,19 +43,15 @@ def get_openaire_sample(keywords, size=10_000, page=1):
     tree = html.fromstring(initial_response.content)
     n_results = int(tree.xpath("//total")[0].text)
 
-    if n_results > 10_000:  # if hitting openaire limit
+    if n_results > 10_000:  # if hitting the openaire limit for a single request
         requests_required = int(n_results) // 10_000 + 1
         response = ""
         for r in range(requests_required):
+            params["page"] = r
             subsequent_response = requests.get(
                 "https://api.openaire.eu/search/researchProducts",
                 headers={"Authorization": token},
-                params={
-                    "keywords": "{t}".format(t=keywords),
-                    "format": "xml",
-                    "size": 10_000,
-                    "page": r,
-                },
+                params=params,
             )
             subsequent_response = subsequent_response.content.decode("utf-8").split(
                 "\n"
@@ -151,10 +152,6 @@ if __name__ == "__main__":
     import pandas as pd
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--page", type=int, default=1, help="Page number")
-    parser.add_argument(
-        "--size", type=int, default=10_000, help="Number of results to get"
-    )
     parser.add_argument(
         "--keywords",
         type=str,
@@ -164,9 +161,7 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    openaire_data, n = get_openaire_sample(
-        keywords=args.keywords, size=args.size, page=args.page
-    )
+    openaire_data, n = get_openaire_sample(keywords=args.keywords)
     print(f"Results found: {n}")
     # with open("openaire.xml", "w") as f:
     #     print(openaire_data.decode("utf-8"), file=f)
